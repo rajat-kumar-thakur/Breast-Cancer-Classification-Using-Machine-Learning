@@ -45,10 +45,10 @@ The project workflow is divided into 5 key stages:
 ### 🧼 Step 2: Data Preprocessing & Feature Engineering
 - **Data Cleaning**: Handling missing values and anomalies
 - **Feature Engineering**: Created 4 new features using the raw data:
-  - `volume_mean` = \( \frac{4}{3}\pi \cdot \text{radius\_mean}^3 \)
-  - `volume_worst` = \( \frac{4}{3}\pi \cdot \text{radius\_worst}^3 \)
-  - `surface_area_mean` = \( 4\pi \cdot \text{radius\_mean}^2 \)
-  - `surface_area_to_volume_ratio` = \( \frac{\text{surface\_area\_mean}}{\text{volume\_mean}} \)
+  - `volume_mean` = $\frac{4}{3}\pi\,(radius_{mean})^3$
+  - `volume_worst` = $\frac{4}{3}\pi\,(radius_{worst})^3$
+  - `surface_area_mean` = $4\pi\,(radius_{mean})^2$
+  - `surface_area_to_volume_ratio` = $\frac{surface\_area\_mean}{volume\_mean}$
 
 📊 **Visualization**:
 - Histograms with KDE curves to compare the distribution of original and newly engineered features.
