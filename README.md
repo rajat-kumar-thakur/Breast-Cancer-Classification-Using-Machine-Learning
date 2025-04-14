@@ -120,11 +120,6 @@ The project workflow is divided into 5 key stages:
 
 ---
 
-## 📁 Repository Structure
-
-
----
-
 ## 📷 Workflow Diagram
 
 ![Workflow](workflow_diagram.png)
