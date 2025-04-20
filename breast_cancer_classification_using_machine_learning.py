@@ -55,12 +55,16 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import time
+from scipy.cluster.hierarchy import linkage, dendrogram
 from subprocess import check_output
 import warnings
 warnings.filterwarnings('ignore')
 from scipy import stats
 
 """## **1. Dataset Collection and Visualization**"""
+
+from google.colab import drive
+drive.mount('/content/drive')
 
 data = pd.read_csv('/content/drive/MyDrive/Breast-Cancer-Classification-Using-Machine-Learning/data.csv')
 
@@ -243,13 +247,40 @@ These calculated features is a form of feature engineering that leverages domain
 
 x_processed = x.copy()
 
-x_processed['volume_mean'] = (4/3) * np.pi * (x_processed['radius_mean'] ** 3)
-x_processed['volume_worst'] = (4/3) * np.pi * (x_processed['radius_worst'] ** 3)
+# Geometric features
+x_processed['volume_mean']              = (4/3) * np.pi * (x_processed['radius_mean']  ** 3)
+x_processed['volume_worst']             = (4/3) * np.pi * (x_processed['radius_worst'] ** 3)
+x_processed['surface_area_mean']        = 4 * np.pi * (x_processed['radius_mean']  ** 2)
+x_processed['surface_area_to_volume_ratio'] = (x_processed['surface_area_mean'] / x_processed['volume_mean'])
 
-x_processed['surface_area_mean'] = 4 * np.pi * (x_processed['radius_mean'] ** 2)
-x_processed['surface_area_to_volume_ratio'] = x_processed['surface_area_mean'] / x_processed['volume_mean']
+# Ratios worst/mean
+x_processed['radius_ratio']             = x_processed['radius_worst']  / x_processed['radius_mean']
+x_processed['area_ratio']               = x_processed['area_worst']    / x_processed['area_mean']
+x_processed['compactness_ratio']        = x_processed['compactness_worst'] / x_processed['compactness_mean']
+x_processed['concavity_ratio']          = x_processed['concavity_worst']   / x_processed['concavity_mean']
+x_processed['concave_points_ratio']     = x_processed['concave points_worst'] / x_processed['concave points_mean']
 
-x_processed.head()
+# Absolute differences
+x_processed['texture_difference']       = x_processed['texture_worst'] - x_processed['texture_mean']
+x_processed['perimeter_difference']     = x_processed['perimeter_worst'] - x_processed['perimeter_mean']
+x_processed['smoothness_change']        = x_processed['smoothness_worst'] - x_processed['smoothness_mean']
+x_processed['symmetry_change']          = x_processed['symmetry_worst']   - x_processed['symmetry_mean']
+
+# More ratios and derived metrics
+x_processed['fractal_dimension_ratio']  = x_processed['fractal_dimension_worst'] / x_processed['fractal_dimension_mean']
+x_processed['area_to_radius_mean']      = x_processed['area_mean'] / (x_processed['radius_mean'] ** 2)
+x_processed['radius_se_to_mean_ratio']  = x_processed['radius_se'] / x_processed['radius_mean']
+x_processed['area_se_to_area_mean_ratio'] = x_processed['area_se'] / x_processed['area_mean']
+x_processed['perimeter_to_radius_ratio']  = x_processed['perimeter_mean'] / x_processed['radius_mean']
+x_processed['mean_texture_to_symmetry_ratio'] = x_processed['texture_mean'] / x_processed['symmetry_mean']
+x_processed['concavity_to_compactness_ratio'] = x_processed['concavity_mean'] / x_processed['compactness_mean']
+
+new_features = [col for col in x_processed.columns if col not in x.columns]
+new_dataset = x_processed[new_features]
+
+new_dataset.to_csv('/content/drive/MyDrive/Breast-Cancer-Classification-Using-Machine-Learning/extracted_features_dataset.csv', index=False)
+
+new_dataset.head()
 
 x.head()
 
@@ -291,108 +322,409 @@ plt.show()
 
 4. The transformation to volume and surface area features allows models or analyses to capture nonlinear effects that the linear radius cannot.
 
-## **3. Data Transformation and Statistical Analysis**
-
-### 3.1 Feature selection with correlation and random forest classification
-
-As it can be seen in map heat figure radius_mean, perimeter_mean and area_mean are correlated with each other so we will use only area_mean. So lets find other correlated features and look accuracy with random forest classifier.
-
-Compactness_mean, concavity_mean and concave points_mean are correlated with each other.Therefore I only choose concavity_mean. Apart from these, radius_se, perimeter_se and area_se are correlated and I only use area_se. radius_worst, perimeter_worst and area_worst are correlated so I use area_worst. Compactness_worst, concavity_worst and concave points_worst so I use concavity_worst. Compactness_se, concavity_se and concave points_se so I use concavity_se. texture_mean and texture_worst are correlated and I use texture_mean. area_worst and area_mean are correlated, I use area_mean.
+### 2.4 Data Representation after Feature Extraction
 """
 
-x = x_processed.copy()
+# 1. Load datasets
+original = pd.read_csv('/content/drive/MyDrive/Breast-Cancer-Classification-Using-Machine-Learning/data.csv')
+new_feats = pd.read_csv('/content/drive/MyDrive/Breast-Cancer-Classification-Using-Machine-Learning/extracted_features_dataset.csv')
 
-drop_list1 = ['perimeter_mean','radius_mean','compactness_mean','concave points_mean','radius_se','perimeter_se','radius_worst','perimeter_worst','compactness_worst','concave points_worst','compactness_se','concave points_se','texture_worst','area_worst']
-x_1 = x.drop(drop_list1,axis = 1 )
-x_1.head()
+# 2. Merge labels into new-features DataFrame
+df = new_feats.copy()
+df['diagnosis'] = original['diagnosis']  # ensure column is named 'diagnosis'
 
-f,ax = plt.subplots(figsize=(14, 14))
-sns.heatmap(x_1.corr(), annot=True, linewidths=.5, fmt= '.1f',ax=ax)
-
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import f1_score,confusion_matrix
-from sklearn.metrics import accuracy_score
-
-x_train, x_test, y_train, y_test = train_test_split(x_1, y, test_size=0.3, random_state=42)
-
-clf_rf = RandomForestClassifier(random_state=43)
-clr_rf = clf_rf.fit(x_train,y_train)
-
-ac = accuracy_score(y_test,clf_rf.predict(x_test))
-print('Accuracy is: ',ac)
-cm = confusion_matrix(y_test,clf_rf.predict(x_test))
-sns.heatmap(cm,annot=True,fmt="d")
-
-"""Accuracy is almost 97% and as it can be seen in confusion matrix, we made few wrong prediction.
-
-In random forest classification method there is a featureimportances attributes that is the feature importances (the higher, the more important the feature).
-"""
-
-clf_rf_5 = RandomForestClassifier()
-clr_rf_5 = clf_rf_5.fit(x_train,y_train)
-importances = clr_rf_5.feature_importances_
-std = np.std([tree.feature_importances_ for tree in clf_rf.estimators_],
-             axis=0)
-indices = np.argsort(importances)[::-1]
-
-print("Feature ranking:")
-
-for f in range(x_train.shape[1]):
-    print("%d. feature %d (%f)" % (f + 1, indices[f], importances[indices[f]]))
-
-
-plt.figure(1, figsize=(14, 13))
-plt.title("Feature importances")
-plt.bar(range(x_train.shape[1]), importances[indices],
-       color="g", yerr=std[indices], align="center")
-plt.xticks(range(x_train.shape[1]), x_train.columns[indices],rotation=90)
-plt.xlim([-1, x_train.shape[1]])
+# 1️⃣ LINE CHART
+plt.figure()
+for cls in df['diagnosis'].unique():
+    sub = df[df['diagnosis'] == cls].sort_values('volume_mean')
+    plt.plot(
+        sub['volume_mean'],
+        sub['surface_area_to_volume_ratio'],
+        label=cls
+    )
+plt.xlabel('Volume (mean)')
+plt.ylabel('Surface Area / Volume Ratio')
+plt.title('Volume vs. Surface‑Area‑to‑Volume Ratio by Class')
+plt.legend()
 plt.show()
 
-"""As you can seen in plot above, after 7 best features importance of features decrease. Therefore we can focus these 7 features.
+# 2️⃣ SCATTER PLOT
+plt.figure()
+for cls in df['diagnosis'].unique():
+    sub = df[df['diagnosis'] == cls]
+    plt.scatter(
+        sub['radius_ratio'],
+        sub['concavity_ratio'],
+        alpha=0.6,
+        label=cls
+    )
+plt.xlabel('Radius Ratio (worst/mean)')
+plt.ylabel('Concavity Ratio (worst/mean)')
+plt.title('Radius Ratio vs. Concavity Ratio')
+plt.legend()
+plt.show()
+
+# 3️⃣ PIE CHART
+counts = df['diagnosis'].value_counts()
+plt.figure()
+plt.pie(counts, labels=counts.index, autopct='%1.1f%%')
+plt.title('Class Distribution')
+plt.show()
+
+# 4️⃣ HISTOGRAMS (key continuous features) with subplots
+key_feats = ['volume_mean', 'volume_worst', 'surface_area_to_volume_ratio']
+
+fig, axes = plt.subplots(1, len(key_feats), figsize=(15, 5), sharey=True)
+for ax, feat in zip(axes, key_feats):
+    for cls in df['diagnosis'].unique():
+        ax.hist(
+            df[df['diagnosis'] == cls][feat].dropna(),
+            bins=30,
+            alpha=0.5,
+            label=cls
+        )
+    ax.set_xlabel(feat)
+    ax.set_title(f'Distribution of {feat}')
+
+axes[0].set_ylabel('Frequency')
+axes[0].legend(title='Class')
+plt.suptitle('Histograms of Key Continuous Features by Class')
+plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+plt.show()
+
+# 5️⃣ BUBBLE CHART
+plt.figure()
+plt.scatter(
+    df['texture_difference'],
+    df['perimeter_difference'],
+    s = df['volume_mean'] / 100,  # scale down for visibility
+    alpha=0.5
+)
+plt.xlabel('Texture Difference (worst – mean)')
+plt.ylabel('Perimeter Difference (worst – mean)')
+plt.title('Bubble Chart: Texture vs. Perimeter Difference')
+plt.show()
+
+# 7️⃣ DENDROGRAM
+X = df[new_feats.columns].dropna()
+Z = linkage(X, method='ward')
+plt.figure(figsize=(12, 4))
+dendrogram(Z, no_labels=True)
+plt.title('Hierarchical Clustering Dendrogram')
+plt.ylabel('Distance')
+plt.show()
+
+# 8️⃣ SCATTER PLOT
+plt.figure()
+plt.scatter(
+    df['volume_mean'],
+    df['surface_area_mean'],
+    alpha=0.6
+)
+plt.xlabel('Volume (mean)')
+plt.ylabel('Surface Area (mean)')
+plt.title('Volume (mean) vs. Surface Area (mean)')
+plt.show()
+
+# 9️⃣ HEATMAP
+corr = df[new_feats.columns].corr()
+plt.figure(figsize=(8, 6))
+plt.imshow(corr, aspect='auto')
+plt.colorbar(label='Correlation')
+plt.xticks(range(len(corr)), corr.columns, rotation=90)
+plt.yticks(range(len(corr)), corr.columns)
+plt.title('Correlation Heatmap of Engineered Features')
+plt.tight_layout()
+plt.show()
+
+# 🔟 MULTIPLE HISTOGRAMS
+plt.figure(figsize=(12, 10))
+df[new_feats.columns].hist(bins=20, layout=(7, 3), figsize=(12, 14))
+plt.suptitle('Histograms of All Engineered Features')
+plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+plt.show()
+
+"""## **3. Data Transformation and Statistical Analysis**
+
+### 3.1 Feature selection
+"""
+
+orig = pd.read_csv('/content/drive/MyDrive/Breast-Cancer-Classification-Using-Machine-Learning/data.csv')
+X = pd.read_csv('/content/drive/MyDrive/Breast-Cancer-Classification-Using-Machine-Learning/extracted_features_dataset.csv')
+y = orig['diagnosis'].map({'B': 0, 'M': 1})
+
+"""#### 3.1.1 Mutual Information (MI) Feature Selection"""
+
+from sklearn.feature_selection import mutual_info_classif
+from sklearn.impute import SimpleImputer
+
+imp = SimpleImputer(strategy='median')
+X_imp = pd.DataFrame(imp.fit_transform(X), columns=X.columns)
+# 1. Mutual Information (MI)
+mi_scores = mutual_info_classif(X_imp, y, random_state=42)
+mi_series = pd.Series(mi_scores, index=X.columns).sort_values(ascending=False)
+print("Mutual Information scores:\n", mi_series)
+
+"""#### 3.1.2 Recursive Feature Elimination (RFE)"""
+
+# 2. Recursive Feature Elimination (RFE) – top 10 features
+from sklearn.feature_selection import RFE
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+
+# Split into train/test to avoid overfitting during selection
+X_train, X_test, y_train, y_test = train_test_split(
+    X_imp, y, test_size=0.2, random_state=42
+)
+
+# Use a simple estimator (logistic regression) for RFE
+estimator = LogisticRegression(max_iter=1000, solver='liblinear')
+selector = RFE(estimator, n_features_to_select=10, step=1)
+selector = selector.fit(X_train, y_train)
+
+# Get the mask of selected features
+selected_mask = selector.support_
+selected_features = X.columns[selected_mask].tolist()
+
+print("Top 10 features selected by RFE:")
+print(selected_features)
+
+"""#### 3.1.3 Embedded Method – Feature Importance via Random Forest"""
+
+# 3. Embedded Method – Feature Importance via Random Forest
+from sklearn.ensemble import RandomForestClassifier
+# Split into train/test
+X_train, X_test, y_train, y_test = train_test_split(
+    X_imp, y, test_size=0.2, random_state=42
+)
+
+# Train Random Forest
+rf = RandomForestClassifier(n_estimators=100, random_state=42)
+rf.fit(X_train, y_train)
+
+# Extract and sort feature importances
+importances = rf.feature_importances_
+imp_series = pd.Series(importances, index=X.columns)
+imp_series = imp_series.sort_values(ascending=False)
+
+print("Random Forest feature importances:")
+print(imp_series)
+
+"""These are the features seletecd:
+volume_worst
+* Largest estimated tumor volume (4/3·π·radius_worst³)
+* Tops both MI and RF rankings, captures extreme size.
+
+perimeter_difference
+* Δ between worst and mean boundary lengths
+* Second in MI & RF, highlights boundary growth.
+
+volume_mean
+* Average tumor volume (4/3·π·radius_mean³)
+* Strong geometric size indicator.
+
+surface_area_to_volume_ratio
+* surface_area_mean ÷ volume_mean
+* Balances shape vs. size, differentiates growth patterns.
+
+surface_area_mean
+* Average surface area (4·π·radius_mean²)
+* Complements volume_mean for shape insights.
+
+concavity_to_compactness_ratio
+* concavity_mean ÷ compactness_mean
+* Embeds shape irregularity relative to compactness.
+
+radius_ratio
+* radius_worst ÷ radius_mean
+* Simple scale factor of worst vs. average radius.
+
+concave_points_ratio
+* concave points_worst ÷ concave points_mean
+* Emphasizes the increase in inward indentations.
+
+perimeter_to_radius_ratio
+* perimeter_mean ÷ radius_mean
+* A shape‐complexity metric linking boundary to size.
 
 ### 3.2 Feature Extraction with PCA
 
 We will use principle component analysis (PCA) for feature extraction. Before PCA, we need to normalize data for better performance of PCA.
 """
 
-x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=42)
-#normalization
-x_train_N = (x_train-x_train.mean())/(x_train.max()-x_train.min())
-x_test_N = (x_test-x_test.mean())/(x_test.max()-x_test.min())
-
+from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
-pca = PCA()
-pca.fit(x_train_N)
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+import numpy as np
+import matplotlib.pyplot as plt
 
-plt.figure(1, figsize=(14, 13))
-plt.clf()
-plt.axes([.2, .2, .7, .7])
-plt.plot(pca.explained_variance_ratio_, linewidth=2)
-plt.axis('tight')
-plt.xlabel('n_components')
-plt.ylabel('explained_variance_ratio_')
+# 1. Split data
+x_train, x_test, y_train, y_test = train_test_split(X_imp, y, test_size=0.3, random_state=42)
 
-"""**According to variance ratio, 3 components can be chosen.**
+# 2. Z-score Normalization
+scaler = StandardScaler()
+x_train_scaled = scaler.fit_transform(x_train)
+x_test_scaled = scaler.transform(x_test)
 
-### 3.3 Hypothesis Testing
+# 3. PCA to retain 95% variance
+pca = PCA(n_components=0.95)
+x_train_pca = pca.fit_transform(x_train_scaled)
+x_test_pca = pca.transform(x_test_scaled)
 
-I want to learn that are radius mean and area mean related with each other? My null hypothesis is that "relationship between radius mean and area mean is zero in tumor population'.
+# 4. Plot explained variance
+plt.figure(figsize=(10, 6))
+plt.plot(np.cumsum(pca.explained_variance_ratio_), marker='o')
+plt.xlabel('Number of Components')
+plt.ylabel('Cumulative Explained Variance')
+plt.title('PCA - Explained Variance')
+plt.grid(True)
+plt.show()
 
+# 5. Create a DataFrame for component loadings
+loadings = pd.DataFrame(
+    pca.components_,
+    columns=X_imp.columns,
+    index=[f"PC{i+1}" for i in range(pca.n_components_)]
+)
 
-Now we need to refute this null hypothesis in order to demonstrate that radius mean and area mean are related. (actually we know it from our previous experiences)
+# 6. Display top 3 contributing features for each PC
+top_features = {}
+for pc in loadings.index:
+    top = loadings.loc[pc].abs().sort_values(ascending=False).head(3)
+    top_features[pc] = top.index.tolist()
 
+print("📌 Top contributing original features to each principal component:\n")
+for pc, features in top_features.items():
+    print(f"{pc}: {', '.join(features)}")
 
-lets find p-value (probability value)
+"""Final Feature Count: 8 principal components after applying PCA.
+
+1. texture_difference
+
+2. mean_texture_to_symmetry_ratio
+
+3. smoothness_change
+
+4. area_to_radius_mean
+
+5. symmetry_change
+
+6. concavity_ratio
+
+7. compactness_ratio
+
+8. radius_se_to_mean_ratio
 """
 
-statistic, p_value = stats.ttest_rel(x.radius_mean,x.area_mean)
-print('p-value: ',p_value)
+# ✅ Final 8 selected features
+final_features = [
+    'texture_difference',
+    'mean_texture_to_symmetry_ratio',
+    'smoothness_change',
+    'area_to_radius_mean',
+    'symmetry_change',
+    'concavity_ratio',
+    'compactness_ratio',
+    'radius_se_to_mean_ratio',
+]
 
-"""P values is almost zero so we can reject null hypothesis.
+# 🆕 Create x_1 with these columns
+x_1 = df[final_features].copy()
 
-## **4. Model Implementation**
+# 🔍 Quick preview
+x_1.head()
+
+"""### 3.3 Hypothesis Testing"""
+
+from sklearn.preprocessing import KBinsDiscretizer, MinMaxScaler, StandardScaler
+from scipy.stats import chi2_contingency, ttest_ind, ranksums, f_oneway
+from sklearn.feature_selection import chi2
+from sklearn.manifold import TSNE
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+alpha = 0.05
+imp = SimpleImputer(strategy='median')
+X_imp = pd.DataFrame(imp.fit_transform(x_1), columns=x_1.columns)
+
+"""#### 3.3.1 Chi‑Square Test
+
+* Null Hypothesis (H₀): There is no association between the binned texture_difference (e.g. Low/Medium/High) and the diagnosis (benign vs. malignant).
+
+* Alternative Hypothesis (H₁): There is an association between the binned texture_difference and diagnosis.
+
+* Conclusion: If the computed p‑value < 0.05, we reject H₀ — implying a statistically significant link between texture_difference category and cancer class.
+"""
+
+# 1️⃣ Chi‑Square Test on binned texture_difference
+disc = KBinsDiscretizer(n_bins=3, encode='ordinal', strategy='uniform')
+binned = disc.fit_transform(X_imp[['texture_difference']]).astype(int).ravel()
+contingency = pd.crosstab(binned, y)
+chi2_stat, chi2_p, _, _ = chi2_contingency(contingency)
+print(f"Chi‑Square: p = {chi2_p:.3e} → {'reject H0' if chi2_p < alpha else 'fail to reject H0'}")
+
+"""#### 3.3.2 T‑Test
+
+* Null Hypothesis (H₀): There is no significant difference in the mean texture_difference between the two diagnosis groups (0 = benign, 1 = malignant).
+
+* Alternative Hypothesis (H₁): There is a significant difference in the mean texture_difference between benign and malignant tumors.
+
+* Conclusion: A p‑value < 0.05 → reject H₀, indicating the average texture_difference differs significantly across classes.
+"""
+
+# 2️⃣ T‑Test for each feature
+g0 = X_imp[y == 0]
+g1 = X_imp[y == 1]
+for feat in X_imp.columns:
+    t_stat, t_p = ttest_ind(g0[feat], g1[feat], nan_policy='omit')
+    print(f"T‑Test ({feat}): p = {t_p:.3e} → {'reject H0' if t_p < alpha else 'fail to reject H0'}")
+
+"""#### 3.3.3 t‑SNE Visualization
+
+* Purpose: Project the 9-dimensional feature space down to 2D, revealing any natural clustering by diagnosis.
+
+* Conclusion: Well‑separated clusters in the t‑SNE plot suggest that the final features embed enough structure to distinguish benign vs. malignant.
+"""
+
+# 3️⃣ t‑SNE Visualization
+tsne = TSNE(n_components=2, random_state=42)
+proj = tsne.fit_transform(X_imp)
+plt.figure()
+plt.scatter(proj[:,0], proj[:,1], c=y, alpha=0.7)
+plt.xlabel('TSNE-1'); plt.ylabel('TSNE-2'); plt.title('t-SNE Projection')
+plt.show()
+print("t‑SNE: inspect plot for cluster separation between classes")
+
+"""#### 3.3.4 Wilcoxon Rank‑Sum Test
+
+* Null Hypothesis (H₀): The median texture_difference is the same in both diagnosis groups.
+
+* Alternative Hypothesis (H₁): The median texture_difference differs between benign and malignant groups.
+
+* Conclusion: If p‑value < 0.05 → reject H₀, showing a statistically significant shift in median texture_difference between classes.
+"""
+
+# 4️⃣ Wilcoxon Rank‑Sum Test
+for feat in X_imp.columns:
+    w_stat, w_p = ranksums(g0[feat], g1[feat])
+    print(f"Wilcoxon ({feat}): p = {w_p:.3e} → {'reject H0' if w_p < alpha else 'fail to reject H0'}")
+
+"""#### 3.3.5 ANOVA Test
+
+* Null Hypothesis (H₀): The means of mean_texture_to_symmetry_ratio are equal across three binned categories of texture_difference (Low/Medium/High).
+
+* Alternative Hypothesis (H₁): At least one category’s mean_texture_to_symmetry_ratio differs from the others.
+
+* Conclusion: p‑value < 0.05 → reject H₀, indicating that mean_texture_to_symmetry_ratio varies significantly across texture_difference bins.
+"""
+
+# 5️⃣ ANOVA Test
+for feat in X_imp.columns:
+    a_stat, a_p = f_oneway(g0[feat], g1[feat])
+    print(f"ANOVA ({feat}): p = {a_p:.3e} → {'reject H0' if a_p < alpha else 'fail to reject H0'}")
+
+"""## **4. Model Implementation**
 
 ### 4.1 Random Forest Classification
 
@@ -401,7 +733,7 @@ The Random Forest Classifier by default does not apply any specific strategy to 
 
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 
-x_train, x_test, y_train, y_test = train_test_split(x_1, y, test_size=0.3, random_state=42)
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=42)
 
 # Train a Random Forest Classifier (default n_estimators=10)
 clf_rf = RandomForestClassifier(random_state=43)
@@ -434,7 +766,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 
 # Split the dataset: 70% training, 30% testing
-x_train, x_test, y_train, y_test = train_test_split(x_1, y, test_size=0.3, random_state=42)
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=42)
 
 lr_model = LogisticRegression(solver='liblinear', random_state=42)
 lr_model.fit(x_train, y_train)
@@ -471,7 +803,7 @@ from xgboost import XGBClassifier
 from sklearn.preprocessing import LabelEncoder
 
 # Split the dataset: 70% training, 30% testing
-x_train, x_test, y_train, y_test = train_test_split(x_1, y, test_size=0.3, random_state=42)
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=42)
 
 # Initialize LabelEncoder
 label_encoder = LabelEncoder()
@@ -511,106 +843,390 @@ print(report_df)
 
 """XGBoost does not automatically solve class imbalance problems. However, you can address imbalance by adjusting the parameter scale_pos_weight (commonly used in binary classification) to assign a higher weight to the minority class.
 
-## **5. Results and Comparisons**
+### 4.4 Decision Tree (DecisionTreeClassifier)
 """
 
-# Create visualizations
-fig, axes = plt.subplots(2, 2, figsize=(18, 12))
-fig.suptitle("Model Performance Comparisons", fontsize=20)
+# Decision Tree
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-# 1. Bar chart for Accuracy Comparison with a zoomed y-axis
-models = ['Random Forest', 'Logistic Regression', 'XGBoost']
-accuracies = [accuracy_score_rf, accuracy_score_lr, accuracy_score_xg]
-sns.barplot(x=models, y=accuracies, palette="viridis", ax=axes[0, 0])
-axes[0, 0].set_title("Accuracy Comparison (Zoomed)")
-axes[0, 0].set_ylabel("Accuracy")
-y_min = min(accuracies) - 0.01
-y_max = max(accuracies) + 0.01
-axes[0, 0].set_ylim(y_min, y_max)
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=42)
 
-# 2. Confusion Matrix for Random Forest
-sns.heatmap(cm_rf, annot=True, fmt="d", cmap="Blues", ax=axes[0, 1])
-axes[0, 1].set_title("Random Forest Confusion Matrix")
-axes[0, 1].set_xlabel("Predicted Label")
-axes[0, 1].set_ylabel("True Label")
+clf_dt = DecisionTreeClassifier(random_state=43)
+clf_dt.fit(x_train, y_train)
 
-# 3. Confusion Matrix for Logistic Regression
-sns.heatmap(cm_lr, annot=True, fmt="d", cmap="Greens", ax=axes[1, 0])
-axes[1, 0].set_title("Logistic Regression Confusion Matrix")
-axes[1, 0].set_xlabel("Predicted Label")
-axes[1, 0].set_ylabel("True Label")
+accuracy_score_dt = accuracy_score(y_test, clf_dt.predict(x_test))
+print('Decision Tree Accuracy:', accuracy_score_dt)
 
-# 4. Confusion Matrix for XGBoost
-sns.heatmap(cm_xg, annot=True, fmt="d", cmap="Oranges", ax=axes[1, 1])
-axes[1, 1].set_title("XGBoost Confusion Matrix")
-axes[1, 1].set_xlabel("Predicted Label")
-axes[1, 1].set_ylabel("True Label")
+cm_dt = confusion_matrix(y_test, clf_dt.predict(x_test))
+plt.figure(figsize=(6,5))
+sns.heatmap(cm_dt, annot=True, fmt="d")
+plt.title("Decision Tree Confusion Matrix")
+plt.xlabel("Predicted")
+plt.ylabel("True")
+plt.show()
 
-# Annotate each bar with its accuracy value
+print(classification_report(y_test, clf_dt.predict(x_test)))
+
+"""### 4.5 KNN (KNeighborsClassifier)"""
+
+# k-Nearest Neighbors
+from sklearn.neighbors import KNeighborsClassifier
+
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=42)
+
+clf_knn = KNeighborsClassifier(n_neighbors=5)
+clf_knn.fit(x_train, y_train)
+
+accuracy_score_knn = accuracy_score(y_test, clf_knn.predict(x_test))
+print('KNN Accuracy:', accuracy_score_knn)
+
+cm_knn = confusion_matrix(y_test, clf_knn.predict(x_test))
+plt.figure(figsize=(6,5))
+sns.heatmap(cm_knn, annot=True, fmt="d")
+plt.title("KNN Confusion Matrix")
+plt.xlabel("Predicted")
+plt.ylabel("True")
+plt.show()
+
+print(classification_report(y_test, clf_knn.predict(x_test)))
+
+"""### 4.6 Support Vector Machine (SVM)"""
+
+# Support Vector Machine
+from sklearn.svm import SVC
+
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=42)
+
+clf_svc = SVC(kernel='rbf', probability=True, random_state=43)
+clf_svc.fit(x_train, y_train)
+
+accuracy_score_svc = accuracy_score(y_test, clf_svc.predict(x_test))
+print('SVM Accuracy:', accuracy_score_svc)
+
+cm_svc = confusion_matrix(y_test, clf_svc.predict(x_test))
+plt.figure(figsize=(6,5))
+sns.heatmap(cm_svc, annot=True, fmt="d")
+plt.title("SVM Confusion Matrix")
+plt.xlabel("Predicted")
+plt.ylabel("True")
+plt.show()
+
+print(classification_report(y_test, clf_svc.predict(x_test)))
+
+"""### 4.7 Gaussian Naive Bayes (GaussianNB)"""
+
+# Gaussian Naive Bayes
+from sklearn.naive_bayes import GaussianNB
+
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=42)
+
+clf_gnb = GaussianNB()
+clf_gnb.fit(x_train, y_train)
+
+accuracy_score_gnb = accuracy_score(y_test, clf_gnb.predict(x_test))
+print('GaussianNB Accuracy:', accuracy_score_gnb)
+
+cm_gnb = confusion_matrix(y_test, clf_gnb.predict(x_test))
+plt.figure(figsize=(6,5))
+sns.heatmap(cm_gnb, annot=True, fmt="d")
+plt.title("GaussianNB Confusion Matrix")
+plt.xlabel("Predicted")
+plt.ylabel("True")
+plt.show()
+
+print(classification_report(y_test, clf_gnb.predict(x_test)))
+
+"""### 4.8 AdaBoost (AdaBoostClassifier)"""
+
+# AdaBoost
+from sklearn.ensemble import AdaBoostClassifier
+
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=42)
+
+clf_ab = AdaBoostClassifier(n_estimators=50, random_state=43)
+clf_ab.fit(x_train, y_train)
+
+accuracy_score_ab = accuracy_score(y_test, clf_ab.predict(x_test))
+print('AdaBoost Accuracy:', accuracy_score_ab)
+
+cm_ab = confusion_matrix(y_test, clf_ab.predict(x_test))
+plt.figure(figsize=(6,5))
+sns.heatmap(cm_ab, annot=True, fmt="d")
+plt.title("AdaBoost Confusion Matrix")
+plt.xlabel("Predicted")
+plt.ylabel("True")
+plt.show()
+
+print(classification_report(y_test, clf_ab.predict(x_test)))
+
+"""### 4.9 Gradient Boosting (GradientBoostingClassifier)"""
+
+# Gradient Boosting
+from sklearn.ensemble import GradientBoostingClassifier
+
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=42)
+
+clf_gb = GradientBoostingClassifier(n_estimators=100, random_state=43)
+clf_gb.fit(x_train, y_train)
+
+accuracy_score_gb = accuracy_score(y_test, clf_gb.predict(x_test))
+print('Gradient Boosting Accuracy:', accuracy_score_gb)
+
+cm_gb = confusion_matrix(y_test, clf_gb.predict(x_test))
+plt.figure(figsize=(6,5))
+sns.heatmap(cm_gb, annot=True, fmt="d")
+plt.title("Gradient Boosting Confusion Matrix")
+plt.xlabel("Predicted")
+plt.ylabel("True")
+plt.show()
+
+print(classification_report(y_test, clf_gb.predict(x_test)))
+
+"""### 4.10 Multilayer Perceptron (MLPClassifier)"""
+
+# Multilayer Perceptron
+from sklearn.neural_network import MLPClassifier
+
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=42)
+
+clf_mlp = MLPClassifier(hidden_layer_sizes=(50,25), max_iter=500, random_state=43)
+clf_mlp.fit(x_train, y_train)
+
+accuracy_score_mlp = accuracy_score(y_test, clf_mlp.predict(x_test))
+print('MLP Accuracy:', accuracy_score_mlp)
+
+cm_mlp = confusion_matrix(y_test, clf_mlp.predict(x_test))
+plt.figure(figsize=(6,5))
+sns.heatmap(cm_mlp, annot=True, fmt="d")
+plt.title("MLP Confusion Matrix")
+plt.xlabel("Predicted")
+plt.ylabel("True")
+plt.show()
+
+print(classification_report(y_test, clf_mlp.predict(x_test)))
+
+"""## **5. Results and Comparisons**"""
+
+models = [
+    'Decision Tree', 'KNN', 'SVM', 'GaussianNB',
+    'AdaBoost', 'GradBoost', 'MLP',
+    'Random Forest', 'Logistic Reg', 'XGBoost'
+]
+accuracies = [
+    accuracy_score_dt, accuracy_score_knn, accuracy_score_svc, accuracy_score_gnb,
+    accuracy_score_ab, accuracy_score_gb, accuracy_score_mlp,
+    accuracy_score_rf, accuracy_score_lr, accuracy_score_xg
+]
+cms = [
+    cm_dt, cm_knn, cm_svc, cm_gnb,
+    cm_ab, cm_gb, cm_mlp,
+    cm_rf, cm_lr, cm_xg
+]
+cm_cmaps = [
+    "Blues","Blues","Blues","Blues",
+    "Blues","Blues","Blues",
+    "Blues","Blues","Blues"
+]
+
+# Create 3×4 grid (first plot is bar chart, next 10 are confusion matrices)
+fig, axes = plt.subplots(3, 4, figsize=(20, 15))
+fig.suptitle("Model Performance Comparison", fontsize=22)
+
+# 1️⃣ Bar chart of accuracies
+ax0 = axes[0, 0]
+sns.barplot(x=models, y=accuracies, ax=ax0)
+ax0.set_title("Accuracy Comparison")
+ax0.set_ylabel("Accuracy")
+ax0.set_ylim(min(accuracies) - 0.02, max(accuracies) + 0.02)
 for i, acc in enumerate(accuracies):
-    axes[0, 0].text(i, acc + 0.001, f"{acc:.3f}", ha='center', va='bottom', fontsize=12)
+    ax0.text(i, acc + 0.005, f"{acc:.3f}", ha='center')
+ax0.set_xticklabels(models, rotation=45, ha='right')
+
+# Turn off empty subplot [0,1]
+axes[0,1].axis('off')
+
+# 2️⃣–🔟 Confusion matrices
+idx = 0
+for row in range(0, 3):
+    for col in range(2, 4) if row == 0 else range(0, 4):
+        if row == 0 and col < 2:
+            continue
+        if idx >= len(models):
+            axes[row, col].axis('off')
+        else:
+            sns.heatmap(
+                cms[idx],
+                annot=True,
+                fmt="d",
+                cmap=cm_cmaps[idx],
+                ax=axes[row, col]
+            )
+            axes[row, col].set_title(f"{models[idx]} Confusion Matrix")
+            axes[row, col].set_xlabel("Predicted")
+            axes[row, col].set_ylabel("True")
+            idx += 1
 
 plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 plt.show()
 
 """**Accuracy Comparison**
   
-  Random Forest and XGBoost share the highest reported accuracy (around 0.971), slightly outperforming Logistic Regression (around 0.959). All three algorithms performed relatively well in this specific dataset.
+  Among all models tested, AdaBoost, MLP, and XGBoost reported the highest accuracy (approximately 0.971), followed closely by Random Forest and Logistic Regression (around 0.965). KNN, Gradient Boosting, and GaussianNB also performed well (ranging from 0.94 to 0.96), with Decision Tree slightly trailing at approximately 0.924.
 
 **Confusion Matrices**
 
 Each confusion matrix provides a deeper look into the types of errors each model makes:
 
-1. Random Forest:
-Shows a small number of false positives and false negatives.
-High correct classifications in both classes, consistent with its top accuracy score.
+1. **Random Forest:** Very few false positives or false negatives, indicating strong performance and balance. High true positives for both classes.
 
-2. Logistic Regression:
-Slightly more misclassifications than Random Forest and XGBoost (noticeable in the off-diagonal cells).
-Even so, it still achieves a respectable accuracy (about 95.9%).
+2. **Logistic Regression:** Competitive and reliable, but has slightly more off-diagonal errors compared to XGBoost and Random Forest.
 
-3. XGBoost:
-Confusion matrix looks similar to Random Forest’s with very few off-diagonal errors.
-Maintains high accuracy due to effectively classifying both classes correctly.
+3. **XGBoost:** Nearly identical to Random Forest, but with slightly better recall for malignant cases, which is critical in medical applications.
 
-From these visual results alone, it’s clear:
+4. **MLP:** Offers high precision and recall, closely matching XGBoost in terms of diagnostic performance.
 
-1. Random Forest and XGBoost are nearly tied for best performance in terms of accuracy and confusion matrix outcomes.
+5. **AdaBoost:** Delivers consistent and balanced classification, with a very high F1-score across both classes.
 
-2. Logistic Regression remains competitive but slightly underperforms the other two.
+6. **KNN:** Very strong performance, especially in identifying benign cases with high recall.
 
-3. For practical decisions, choosing between Random Forest and XGBoost may come down to other considerations like training speed, interpretability, or resource constraints, given their near-identical performance.
+7. **Gradient Boosting:** Accurate and stable, though slightly behind AdaBoost and XGBoost.
+
+8. **GaussianNB:** Performs admirably with simplicity, showing decent balance in both classes.
+
+9. **SVM:** Shows perfect precision for malignant cases but slightly lower recall, suggesting it may miss some positive instances.
+
+10. **Decision Tree:** Has the lowest accuracy among the models, though still respectable. Shows slightly more variability in predictions.
 
 **Best Model Selection Criteria**
 1. Precision:
 Measures the proportion of correctly predicted positive instances among all instances predicted as positive.
-Criterion: High precision is critical when the cost of a false positive is high (e.g., in spam detection, diagnosing disease).
+**Criterion:** High precision is critical when the cost of a false positive is high (e.g., in spam detection, diagnosing disease).
 
 2. Recall (Sensitivity):
 Measures the proportion of correctly predicted positive instances among all actual positives.
-Criterion: High recall is essential when missing a positive case would be costly (e.g., early cancer detection).
+**Criterion:** High recall is essential when missing a positive case would be costly (e.g., early cancer detection).
 
 3. F1-Score:
 The harmonic mean of precision and recall.
-Criterion: F1-score provides a balance between precision and recall, particularly useful when both false positives and false negatives carry similar consequences.
+**Criterion:** F1-score provides a balance between precision and recall, particularly useful when both false positives and false negatives carry similar consequences.
 
 **Model Complexity & Performance:**
 
-Random Forest and XGBoost not only maintain higher overall accuracy but also deliver balanced performance in terms of precision and recall, especially by handling the nonlinear interactions more effectively than Logistic Regression.
+1. Random Forest and XGBoost shine with accuracy and interpretability (Random Forest) or adaptability and high recall (XGBoost).
 
-1. Trade-Off Between Precision and Recall:
+2. MLP is highly accurate but less interpretable, which might be a drawback in regulated domains like healthcare.
 
-* Random Forest excels in precision for malignant cases, reducing false positives.
+3. Logistic Regression offers a solid baseline with explainability, making it a trustworthy benchmark.
 
-* XGBoost improves on recall for malignant cases, ensuring fewer cases are missed, which can be crucial in medical diagnostics.
+4. Simpler models like GaussianNB and Decision Tree are useful for quick deployment or interpretability, albeit with some performance trade-off.
 
-2. Use Case Considerations:
+##🔍 Cancer Detection: Model Evaluation & Recommendation
 
-* If reducing false positives is the priority (e.g., avoiding unnecessary interventions), Random Forest might be preferred.
+### 📊 Accuracy Comparison
 
-* If catching as many true malignant cases as possible is critical, XGBoost’s higher recall makes it attractive.
+- **XGBoost** and **Random Forest** share the highest reported accuracy (~0.971).
+- **Logistic Regression** performs slightly lower (~0.959) but remains competitive.
+- All three models perform well on this dataset.
 
-* Logistic Regression, while competitive, may serve as a good baseline but might not capture nonlinear dynamics as effectively as the tree-based models.
+### 🔎 Confusion Matrix Insights
+
+Each matrix reveals how well models handle correct and incorrect predictions:
+
+- **Random Forest**:  
+  - Very few false positives and false negatives.  
+  - Strong true classification in both classes.  
+  - Reflects top accuracy.
+
+- **Logistic Regression**:  
+  - Slightly more misclassifications.  
+  - Accuracy still strong at ~95.9%.
+
+- **XGBoost**:  
+  - Very similar to Random Forest.  
+  - High accuracy due to correctly classifying both classes.
+
+---
+
+#### ✅ Summary of Visual Results
+
+- **Top Performers**: XGBoost and Random Forest are neck-and-neck.
+- **Competitive Baseline**: Logistic Regression underperforms slightly but is still reliable.
+- **Considerations**: Choose between RF & XGBoost based on:
+  - Training time
+  - Interpretability
+  - Resource constraints
+
+---
+
+### 🎯 Best Model Selection Criteria
+
+- **Precision**:  
+  Measures the proportion of true positives among predicted positives.  
+  > Use when false positives are costly (e.g., spam detection, overdiagnosis).
+
+- **Recall (Sensitivity)**:  
+  Measures the proportion of actual positives correctly identified.  
+  > Use when false negatives are costly (e.g., cancer detection, security breaches).
+
+- **F1-Score**:  
+  Harmonic mean of precision and recall.  
+  > Balanced metric when both false positives and negatives are important.
+
+---
+
+### ⚙️ Model Complexity & Performance
+
+- **Random Forest & XGBoost**:  
+  - Strong precision and recall balance.  
+  - Handle nonlinear interactions better than Logistic Regression.
+
+- **Logistic Regression**:  
+  - Good baseline model.  
+  - May not capture complex patterns as well as tree-based models.
+
+---
+
+### ⚖️ Trade-Off: Precision vs. Recall
+
+- **Random Forest**:  
+  - Higher precision for malignant cases  
+  - Reduces false positives
+
+- **XGBoost**:  
+  - Higher recall for malignant cases  
+  - Ensures fewer missed diagnoses  
+  - Important in medical contexts
+
+---
+
+### ✅ Final Recommendation: XGBoost
+
+XGBoost is the most appropriate choice for cancer detection due to:
+
+- 🔍 High recall (crucial for minimizing missed cancer diagnoses)
+- ⚖️ Balanced F1-score and precision
+- 🧠 Ability to handle complex relationships
+- 🧪 Robust generalization and regularization
+
+---
+
+### 💡 Other Notes
+
+- **MLP**: Also performs very well, but less interpretable and more resource-intensive.
+- **Random Forest**: Great choice if reducing false positives is critical.
+- **Not Recommended**:
+  - SVM: High precision but lower recall — risk of missing cancer.
+  - Decision Tree: Lower overall accuracy.
+  - Logistic Regression: Strong baseline but outperformed by ensembles.
+
+---
+
+🩺 In conclusion:  
+**Choose XGBoost** for its superior balance of recall, precision, and robustness in high-stakes environments like cancer detection.
 
 **Submitted By**
 **Rajat Kumar Thakur (202211070)**
