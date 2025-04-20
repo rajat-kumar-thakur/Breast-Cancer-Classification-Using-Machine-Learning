@@ -2,7 +2,7 @@
 
 ## 📌 Project Overview
 
-This project applies machine learning techniques to classify breast cancer tumors as **benign** or **malignant** using the **Breast Cancer Wisconsin Diagnostic** dataset. It involves the complete pipeline: from data preprocessing and visualization to model implementation and performance evaluation.
+This project applies machine learning techniques to classify breast cancer tumors as **benign** or **malignant** using the **Breast Cancer Wisconsin Diagnostic** dataset. It includes a complete pipeline: from data preprocessing, visualization, feature engineering, and hypothesis testing to model training and evaluation.
 
 > **Author**: Rajat Kumar Thakur  
 > **Roll No.**: 202211070  
@@ -16,107 +16,122 @@ This project applies machine learning techniques to classify breast cancer tumor
 - **Classes**:
   - **Benign (B)**: 357
   - **Malignant (M)**: 212  
-- **Source**: Breast Cancer Wisconsin Diagnostic Dataset
+- **Source**: [Breast Cancer Wisconsin Diagnostic Dataset](https://archive.ics.uci.edu/dataset/17/breast+cancer+wisconsin+diagnostic)
 
 ---
 
 ## 🧭 Workflow
 
-The project workflow is divided into 5 key stages:
+The workflow includes multiple steps for a comprehensive analysis and model implementation.
 
 ### 🧮 Step 1: Data Collection & Visualization
-- **Import Dataset**  
-- **Explore Initial Features**: Identify types, missing values, and outliers  
-- **Data Cleaning**: Remove unnecessary columns such as `id`, `Unnamed: 32`, and others if present  
-- **Visual Analysis**:
-  - Distribution of classes
-  - Relationships between features
-- **Statistical Summary** of the dataset
-
-📈 **Plots Used**:
-- Box Plot
-- Joint Plot
-- Violin Plot
-- Swarm Plot
-- Heatmap
+- **Initial Checks**: Data types, missing values, outliers
+- **Cleaning**: Removed `id`, `Unnamed: 32`, and other irrelevant columns
+- **Visualizations**:
+  - Box Plot
+  - Joint Plot
+  - Violin Plot
+  - Swarm Plot
+  - Heatmap
 
 ---
 
 ### 🧼 Step 2: Data Preprocessing & Feature Engineering
-- **Data Cleaning**: Handling missing values and anomalies
-- **Feature Engineering**: Created 4 new features using the raw data:
-  - `volume_mean` = $\frac{4}{3}\pi\,(radius_{mean})^3$
-  - `volume_worst` = $\frac{4}{3}\pi\,(radius_{worst})^3$
-  - `surface_area_mean` = $4\pi\,(radius_{mean})^2$
-  - `surface_area_to_volume_ratio` = $\frac{surface\_area\_mean}{volume\_mean}$
 
-📊 **Visualization**:
-- Histograms with KDE curves to compare the distribution of original and newly engineered features.
+#### 🔧 Engineered Features (20 Total), e.g.:
+- `volume_mean` = (4/3)π(radius_mean)^3
+- `surface_area_to_volume_ratio` = surface_area_mean / volume_mean
+- `radius_ratio`, `compactness_ratio`, `texture_difference`, etc.
 
----
-
-### 🔁 Step 3: Data Transformation
-- **Feature Selection**: 
-  - Employed the **Filter Method** to remove redundant features using correlation heatmap analysis.
-  - Selected **20 representative features**.
-- **Feature Scaling**: Standardization to ensure zero mean and unit variance.
-- **Dimensionality Reduction**:
-  - Utilized **Principal Component Analysis (PCA)** to reduce dimensionality while preserving significant variance.
-- **Hypothesis Testing**:
-  - A paired **t-test** between `radius_mean` and `area_mean` was performed to detect significant differences and reduce multicollinearity.
+#### 📈 Visualization of Engineered Features:
+- Line Charts
+- Scatter Plots
+- Bubble Charts
+- Pie Chart (for class balance)
+- Histograms (for distribution comparison)
+- Heatmap
+- Dendrogram (for clustering)
+- PCA Plot (scatter)  
+- t-SNE Plot (for class separability)
 
 ---
 
-### 🤖 Step 4: Model Implementation
+### 🔁 Step 3: Feature Selection & Transformation
 
-- **Data Splitting**: 
-  - Divided data into Training (70%) and Test (30%) sets.
-- **Models Applied**:
-  - Random Forest Classifier
+- **Techniques Used**:
+  - **Mutual Information**
+  - **Recursive Feature Elimination (RFE)**
+  - **Random Forest Feature Importance**
+
+- **Final Selected Features (9)**:
+  - `volume_worst`, `volume_mean`, `perimeter_difference`, `surface_area_mean`, etc.
+
+- **Transformation**:
+  - Standardization (Z-score normalization)
+  - PCA (for dimensionality reduction)
+
+---
+
+### 🔬 Step 4: Hypothesis Testing
+
+- **Tests Conducted**:
+  - T-test (e.g., `texture_difference`)
+  - Chi-Square Test
+  - Wilcoxon Rank-Sum Test
+  - ANOVA
+  - t-SNE for 2D visualization
+
+All tests confirmed statistical significance in differentiating between benign and malignant classes.
+
+---
+
+### 🤖 Step 5: Model Implementation
+
+- **Models Used**:
+  - Random Forest
   - Logistic Regression
-  - XGBoost Classifier
+  - XGBoost
+  - Decision Tree
+  - KNN
+  - SVM
+  - GaussianNB
+  - AdaBoost
+  - Gradient Boosting
+  - MLPClassifier
 
-🔍 **Performance Overview**:
-- **Accuracy**:
-  - Random Forest: 97.1%
-  - Logistic Regression: 95.9%
-  - XGBoost: 97.1%
-
----
-
-### 🧠 Step 5: Results & Comparisons
-
-- **Model Evaluation**:
-  - Detailed comparison based on Accuracy, Precision, Recall, and F1-Score.
-- **Best Model Determination**:
-  - Random Forest and XGBoost emerged as top performers with high accuracy and balanced classification metrics.
+- **Train-Test Split**: 70:30
 
 ---
 
-## 📌 Feature Selection Strategy
+### 🧠 Step 6: Evaluation & Best Model
 
-- Selected **20** key features using correlation analysis to reduce redundancy.
-- Principal Component Analysis further streamlined the dataset for enhanced performance and lower risk of overfitting.
+- **Metrics Used**:
+  - Accuracy
+  - Precision
+  - Recall
+  - F1-Score
+
+> **Best Performing Model**:  
+> **XGBoost** due to high recall, balanced precision, F1-score, and robustness.
 
 ---
 
 ## 📎 Tools & Libraries
 
-- **Python** (Programming Language)
-- **Pandas, NumPy** (Data Manipulation)
-- **Matplotlib, Seaborn** (Data Visualization)
-- **Scikit-learn** (Machine Learning)
-- **XGBoost** (Gradient Boosting)
+- **Languages**: Python  
+- **Data Handling**: Pandas, NumPy  
+- **Visualization**: Matplotlib, Seaborn  
+- **ML & Feature Selection**: Scikit-learn, XGBoost  
+- **Model Evaluation**: Scikit-learn Metrics, Statistical Tests
 
 ---
 
 ## 📚 Key Learnings
 
-> The project provided hands-on experience with:
-- Data cleaning and exploratory data analysis (EDA)
-- Feature engineering, selection, and transformation techniques
-- Implementation and evaluation of multiple classification algorithms
-- Visualization techniques to draw insights from data
+- Full pipeline implementation for a classification task  
+- Importance of feature engineering and statistical testing  
+- Effective use of visualizations and multivariate plots  
+- Comparison of classical and ensemble learning models  
 
 ---
 
